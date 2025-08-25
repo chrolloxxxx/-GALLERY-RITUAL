@@ -417,6 +417,12 @@
         .file-name {
             color: #40e0d0;
             font-weight: 400;
+            transition: color 0.2s ease;
+        }
+        
+        .file-name.file-selected {
+            color: #00ffff;
+            font-weight: 500;
         }
 
         .status-message {
@@ -749,7 +755,7 @@
                 <div class="form-group">
                     <div class="file-upload-wrapper">
                         <input type="file" id="fileInput" class="file-upload-input" accept="image/*">
-                        <label for="fileInput" class="file-upload-button">
+                        <label for="fileInput" class="file-upload-button" id="fileUploadLabel">
                             Choose File | <span class="file-name" id="fileName">No file selected</span>
                         </label>
                     </div>
@@ -812,14 +818,46 @@
 
         function initializeFileUpload() {
             const fileInput = document.getElementById('fileInput');
+            const fileNameSpan = document.getElementById('fileName');
+            
+            console.log('Initializing file upload...'); // Debug log
             
             // Handle file selection
             fileInput.addEventListener('change', function(e) {
-                const fileName = e.target.files[0] ? e.target.files[0].name : 'No file selected';
-                document.getElementById('fileName').textContent = fileName;
+                console.log('File input changed:', e.target.files); // Debug log
                 
-                if (e.target.files[0]) {
+                if (e.target.files && e.target.files[0]) {
+                    const file = e.target.files[0];
+                    const fileName = file.name;
+                    
+                    console.log('File selected:', fileName); // Debug log
+                    
+                    // Update the display
+                    fileNameSpan.textContent = fileName;
+                    fileNameSpan.style.color = '#00ffff';
+                    
                     // Clear the URL input when a file is selected
+                    document.getElementById('imageUrl').value = '';
+                    
+                    // Show status
+                    showStatus('File selected: ' + fileName, 'info');
+                    
+                    // Log file details
+                    console.log('File size:', file.size, 'bytes');
+                    console.log('File type:', file.type);
+                } else {
+                    fileNameSpan.textContent = 'No file selected';
+                    fileNameSpan.style.color = '#40e0d0';
+                }
+            });
+            
+            // Also listen for input event as backup
+            fileInput.addEventListener('input', function(e) {
+                console.log('File input event triggered'); // Debug log
+                if (e.target.files && e.target.files[0]) {
+                    const fileName = e.target.files[0].name;
+                    fileNameSpan.textContent = fileName;
+                    fileNameSpan.style.color = '#00ffff';
                     document.getElementById('imageUrl').value = '';
                     showStatus('File selected: ' + fileName, 'info');
                 }
