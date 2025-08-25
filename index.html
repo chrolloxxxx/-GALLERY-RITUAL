@@ -778,10 +778,13 @@
             }
         });
 
-        // Placeholder submit functionality
+        // Storage for posts (in memory)
+        let posts = [];
+
+        // Submit functionality with file handling
         document.getElementById('submitBtn').addEventListener('click', function() {
-            const handle = document.getElementById('handleInput').value;
-            const imageUrl = document.getElementById('imageUrl').value;
+            const handle = document.getElementById('handleInput').value.trim();
+            const imageUrl = document.getElementById('imageUrl').value.trim();
             const fileInput = document.getElementById('fileInput');
             
             if (!handle) {
@@ -789,12 +792,14 @@
                 return;
             }
 
+            // Ensure handle starts with @
+            const formattedHandle = handle.startsWith('@') ? handle : '@' + handle;
+
             if (!imageUrl && !fileInput.files[0]) {
                 showStatus('Please provide an image URL or upload a file', 'error');
                 return;
             }
 
-            // Simulate submission
             const btn = this;
             const buttonText = btn.querySelector('.button-text');
             const loading = btn.querySelector('.loading');
@@ -803,19 +808,178 @@
             buttonText.style.opacity = '0';
             loading.style.display = 'block';
 
-            setTimeout(() => {
-                showStatus('Post submitted successfully!', 'success');
+            // Handle file upload
+            if (fileInput.files[0]) {
+                const file = fileInput.files[0];
+                const reader = new FileReader();
                 
-                // Reset form
-                document.getElementById('handleInput').value = '';
-                document.getElementById('imageUrl').value = '';
-                document.getElementById('fileInput').value = '';
-                document.getElementById('fileName').textContent = 'No file selected';
+                reader.onload = function(e) {
+                    const imageDataUrl = e.target.result;
+                    createPost(formattedHandle, imageDataUrl, 'just now');
+                    completeSubmission(btn, buttonText, loading);
+                };
                 
-                btn.disabled = false;
-                buttonText.style.opacity = '1';
-                loading.style.display = 'none';
-            }, 2000);
+                reader.readAsDataURL(file);
+            } 
+            // Handle URL input
+            else if (imageUrl) {
+                // Validate if it's a proper image URL
+                const img = new Image();
+                img.onload = function() {
+                    createPost(formattedHandle, imageUrl, 'just now');
+                    completeSubmission(btn, buttonText, loading);
+                };
+                img.onerror = function() {
+                    showStatus('Invalid image URL or image failed to load', 'error');
+                    btn.disabled = false;
+                    buttonText.style.opacity = '1';
+                    loading.style.display = 'none';
+                };
+                img.src = imageUrl;
+            }
+        });
+
+        function createPost(handle, imageSrc, timeAgo) {
+            const post = {
+                id: Date.now(),
+                handle: handle,
+                imageSrc: imageSrc,
+                text: `New post from ${handle} ✨`,
+                timeAgo: timeAgo,
+                likes: 0,
+                liked: false
+            };
+
+            posts.unshift(post); // Add to beginning of array
+            renderPosts();
+            hideEmptyState();
+        }
+
+        function completeSubmission(btn, buttonText, loading) {
+            showStatus('Post submitted successfully!', 'success');
+            
+            // Reset form
+            document.getElementById('handleInput').value = '';
+            document.getElementById('imageUrl').value = '';
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileName').textContent = 'No file selected';
+            
+            btn.disabled = false;
+            buttonText.style.opacity = '1';
+            loading.style.display = 'none';
+        }
+
+        function renderPosts() {
+            const grid = document.getElementById('memeGrid');
+            
+            if (posts.length === 0) {
+                showEmptyState();
+                return;
+            }
+
+            let html = '';
+            posts.forEach(post => {
+                html += `
+                    <div class="meme-card">
+                        <div class="meme-image" onclick="openImageModal('${post.imageSrc}', '${post.handle}', '${post.text}', '${post.timeAgo}')">
+                            <img src="${post.imageSrc}" alt="Post by ${post.handle}">
+                        </div>
+                        <div class="meme-content">
+                            <div class="meme-text">${post.text}</div>
+                            <div class="meme-footer">
+                                <div class="meme-footer-left">
+                                    <button class="like-button ${post.liked ? 'liked' : ''}" onclick="toggleLike(${post.id})">
+                                        <span class="like-icon">↑</span>
+                                        <span class="like-count">${post.likes}</span>
+                                    </button>
+                                    <span class="meme-handle" onclick="filterByHandle('${post.handle}')">${post.handle}</span>
+                                </div>
+                                <span class="meme-date">${post.timeAgo}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            grid.innerHTML = html;
+        }
+
+        function hideEmptyState() {
+            const grid = document.getElementById('memeGrid');
+            const emptyState = grid.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.style.display = 'none';
+            }
+        }
+
+        function showEmptyState() {
+            const grid = document.getElementById('memeGrid');
+            grid.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🌟</div>
+                    <h3>No posts yet</h3>
+                    <p>Be the first to share something in the Ritual Gallery!</p>
+                </div>
+            `;
+        }
+
+        function toggleLike(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (post) {
+                post.liked = !post.liked;
+                post.likes += post.liked ? 1 : -1;
+                renderPosts();
+            }
+        }
+
+        function filterByHandle(handle) {
+            const filteredPosts = posts.filter(post => post.handle === handle);
+            const grid = document.getElementById('memeGrid');
+            const filterSection = document.getElementById('filterSection');
+            const filterBadge = document.getElementById('filterBadge');
+
+            if (filteredPosts.length === 0) {
+                grid.innerHTML = `
+                    <div class="no-results">
+                        <h3>No posts found</h3>
+                        <p>No posts from ${handle} yet.</p>
+                    </div>
+                `;
+            } else {
+                let html = '';
+                filteredPosts.forEach(post => {
+                    html += `
+                        <div class="meme-card">
+                            <div class="meme-image" onclick="openImageModal('${post.imageSrc}', '${post.handle}', '${post.text}', '${post.timeAgo}')">
+                                <img src="${post.imageSrc}" alt="Post by ${post.handle}">
+                            </div>
+                            <div class="meme-content">
+                                <div class="meme-text">${post.text}</div>
+                                <div class="meme-footer">
+                                    <div class="meme-footer-left">
+                                        <button class="like-button ${post.liked ? 'liked' : ''}" onclick="toggleLike(${post.id})">
+                                            <span class="like-icon">↑</span>
+                                            <span class="like-count">${post.likes}</span>
+                                        </button>
+                                        <span class="meme-handle">${post.handle}</span>
+                                    </div>
+                                    <span class="meme-date">${post.timeAgo}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                grid.innerHTML = html;
+            }
+
+            filterBadge.textContent = `Showing posts by ${handle}`;
+            filterSection.style.display = 'flex';
+        }
+
+        // Clear filter functionality
+        document.getElementById('clearFilter').addEventListener('click', function() {
+            document.getElementById('filterSection').style.display = 'none';
+            renderPosts();
         });
 
         function showStatus(message, type) {
