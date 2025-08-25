@@ -96,7 +96,11 @@
         }
 
         .form-group.handle-group {
-            flex: 0 0 180px;
+            flex: 0 0 150px;
+        }
+
+        .form-group.category-group {
+            flex: 0 0 150px;
         }
 
         .form-group.submit-group {
@@ -428,14 +432,20 @@
 
         .status-success {
             background: rgba(16, 185, 129, 0.1);
-            color: #065f46;
+            color: #10b981;
             border: 2px solid rgba(16, 185, 129, 0.2);
         }
 
         .status-error {
             background: rgba(239, 68, 68, 0.1);
-            color: #991b1b;
+            color: #ef4444;
             border: 2px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .status-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+            border: 2px solid rgba(59, 130, 246, 0.2);
         }
 
         .comments-section {
@@ -583,6 +593,49 @@
             font-weight: 600;
         }
 
+        .category-filters {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .category-filter-btn {
+            background: rgba(40, 40, 40, 0.9);
+            border: 2px solid rgba(0, 255, 255, 0.2);
+            border-radius: 20px;
+            color: #40e0d0;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .category-filter-btn:hover {
+            border-color: rgba(0, 255, 255, 0.4);
+            color: #00ffff;
+            background: rgba(40, 40, 40, 1);
+        }
+
+        .category-filter-btn.active {
+            background: linear-gradient(135deg, #00ffff, #008b8b);
+            color: black;
+            border-color: transparent;
+        }
+
+        .meme-category {
+            background: rgba(0, 255, 255, 0.1);
+            color: #00ffff;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 10px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
         .empty-state {
             text-align: center;
             padding: 80px 20px;
@@ -627,6 +680,7 @@
             }
 
             .form-group.handle-group,
+            .form-group.category-group,
             .form-group.submit-group {
                 flex: 1;
                 width: 100%;
@@ -684,6 +738,14 @@
                 <div class="form-group handle-group">
                     <input type="text" id="handleInput" placeholder="@handle" required>
                 </div>
+                <div class="form-group category-group">
+                    <select id="categorySelect" required>
+                        <option value="">Select Category</option>
+                        <option value="meme">#meme</option>
+                        <option value="art">#art</option>
+                        <option value="myritual">#myritual</option>
+                    </select>
+                </div>
                 <div class="form-group">
                     <input type="url" id="imageUrl" placeholder="https://...image.jpg/png/gif/webp">
                 </div>
@@ -707,6 +769,13 @@
         <div class="filter-section" id="filterSection" style="display: none;">
             <span class="filter-badge" id="filterBadge">Showing posts by @handle</span>
             <button class="clear-btn" id="clearFilter">Clear</button>
+        </div>
+
+        <div class="category-filters">
+            <button class="category-filter-btn active" onclick="filterByCategory('all')">All</button>
+            <button class="category-filter-btn" onclick="filterByCategory('meme')">#meme</button>
+            <button class="category-filter-btn" onclick="filterByCategory('art')">#art</button>
+            <button class="category-filter-btn" onclick="filterByCategory('myritual')">#myritual</button>
         </div>
 
         <div class="meme-grid" id="memeGrid">
@@ -734,80 +803,27 @@
     </div>
 
     <script>
-        // Configuration - Cloudinary settings
+        // Configuration - Update with your actual Cloudinary settings
         const CLOUDINARY_CONFIG = {
-            cloudName: 'dmiz96ygs',
-            uploadPreset: 'ritual_gallery'  // Replace with your actual preset name after creating it
+            cloudName: 'dmiz96ygs', // Your actual cloud name
+            apiKey: '464372242526678', // Your API key from the screenshot
+            apiSecret: 'vtBTxdivXMNh3QLNvt2Wp8CFgbM', // Your API secret from the screenshot
+            uploadPreset: 'ritual_gallery' // You need to create this preset in Cloudinary
         };
 
-        const FIREBASE_CONFIG = {
-            // Add your Firebase config here (optional, for persistent storage)
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT.appspot.com",
-            messagingSenderId: "123456789",
-            appId: "YOUR_APP_ID"
-        };
-
-        // Initialize Firebase (optional)
-        let db = null;
-        if (FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY') {
-            firebase.initializeApp(FIREBASE_CONFIG);
-            db = firebase.firestore();
-        }
-
-        // Storage for posts (in memory + optional database)
+        // Storage for posts and current filter
         let posts = [];
+        let currentCategoryFilter = 'all';
 
         // Load posts on page load
         window.addEventListener('load', function() {
             loadPosts();
         });
 
-        async function loadPosts() {
-            try {
-                if (db) {
-                    // Load from Firebase
-                    const snapshot = await db.collection('posts').orderBy('timestamp', 'desc').get();
-                    posts = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                } else {
-                    // Load from localStorage as fallback
-                    const savedPosts = localStorage.getItem('ritualPosts');
-                    if (savedPosts) {
-                        posts = JSON.parse(savedPosts);
-                    }
-                }
-                renderPosts();
-            } catch (error) {
-                console.error('Error loading posts:', error);
-                renderPosts();
-            }
-        }
-
-        async function savePost(post) {
-            try {
-                if (db) {
-                    // Save to Firebase
-                    const docRef = await db.collection('posts').add(post);
-                    post.id = docRef.id;
-                } else {
-                    // Save to localStorage as fallback
-                    post.id = Date.now().toString();
-                    posts.unshift(post);
-                    localStorage.setItem('ritualPosts', JSON.stringify(posts));
-                }
-                return post;
-            } catch (error) {
-                console.error('Error saving post:', error);
-                // Fallback to memory storage
-                post.id = Date.now().toString();
-                posts.unshift(post);
-                return post;
-            }
+        function loadPosts() {
+            // Since we can't use localStorage or Firebase in artifacts, 
+            // we'll start with empty posts array
+            renderPosts();
         }
 
         // File input handler
@@ -819,11 +835,17 @@
         // Submit functionality with Cloudinary upload
         document.getElementById('submitBtn').addEventListener('click', async function() {
             const handle = document.getElementById('handleInput').value.trim();
+            const category = document.getElementById('categorySelect').value;
             const imageUrl = document.getElementById('imageUrl').value.trim();
             const fileInput = document.getElementById('fileInput');
             
             if (!handle) {
                 showStatus('Please enter a handle', 'error');
+                return;
+            }
+
+            if (!category) {
+                showStatus('Please select a category', 'error');
                 return;
             }
 
@@ -848,24 +870,8 @@
 
                 // Handle file upload to Cloudinary
                 if (fileInput.files[0]) {
-                    if (CLOUDINARY_CONFIG.cloudName === 'YOUR_CLOUD_NAME') {
-                        // Fallback to data URL if Cloudinary not configured
-                        const file = fileInput.files[0];
-                        const reader = new FileReader();
-                        
-                        reader.onload = async function(e) {
-                            const imageDataUrl = e.target.result;
-                            await createAndSavePost(formattedHandle, imageDataUrl);
-                            completeSubmission(btn, buttonText, loading);
-                        };
-                        
-                        reader.readAsDataURL(file);
-                        return;
-                    } else {
-                        // Upload to Cloudinary
-                        showStatus('Uploading image...', 'info');
-                        finalImageUrl = await uploadToCloudinary(fileInput.files[0]);
-                    }
+                    showStatus('Uploading image...', 'info');
+                    finalImageUrl = await uploadToCloudinary(fileInput.files[0]);
                 } 
                 // Handle URL input
                 else if (imageUrl) {
@@ -874,7 +880,7 @@
                     finalImageUrl = imageUrl;
                 }
 
-                await createAndSavePost(formattedHandle, finalImageUrl);
+                await createAndSavePost(formattedHandle, finalImageUrl, category);
                 completeSubmission(btn, buttonText, loading);
 
             } catch (error) {
@@ -887,25 +893,30 @@
         });
 
         async function uploadToCloudinary(file) {
-            return new Promise((resolve, reject) => {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+            
+            // Add timestamp and signature for security (optional but recommended)
+            const timestamp = Math.round(new Date().getTime() / 1000);
+            formData.append('timestamp', timestamp);
 
-                fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, {
+            try {
+                const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, {
                     method: 'POST',
                     body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        reject(new Error(data.error.message));
-                    } else {
-                        resolve(data.secure_url);
-                    }
-                })
-                .catch(error => reject(error));
-            });
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+                
+                return data.secure_url;
+            } catch (error) {
+                throw new Error(`Upload failed: ${error.message}`);
+            }
         }
 
         async function validateImageUrl(url) {
@@ -917,19 +928,28 @@
             });
         }
 
-        async function createAndSavePost(handle, imageSrc) {
+        async function createAndSavePost(handle, imageSrc, category) {
+            const categoryHashtags = {
+                meme: '#meme',
+                art: '#art',
+                myritual: '#myritual'
+            };
+
             const post = {
+                id: Date.now().toString(),
                 handle: handle,
                 imageSrc: imageSrc,
-                text: `New post from ${handle} ✨`,
+                text: `New post from ${handle} ✨ ${categoryHashtags[category]}`,
+                category: category,
+                hashtag: categoryHashtags[category],
                 timestamp: new Date(),
                 timeAgo: 'just now',
                 likes: 0,
                 liked: false
             };
 
-            const savedPost = await savePost(post);
-            posts.unshift(savedPost);
+            // Add to posts array (memory storage only for artifacts)
+            posts.unshift(post);
             renderPosts();
             hideEmptyState();
         }
@@ -939,6 +959,7 @@
             
             // Reset form
             document.getElementById('handleInput').value = '';
+            document.getElementById('categorySelect').value = '';
             document.getElementById('imageUrl').value = '';
             document.getElementById('fileInput').value = '';
             document.getElementById('fileName').textContent = 'No file selected';
@@ -964,166 +985,5 @@
                             <img src="${post.imageSrc}" alt="Post by ${post.handle}" onerror="this.parentElement.innerHTML='<div class=\\"meme-placeholder\\"><div class=\\"meme-placeholder-icon\\">📷</div><div>Image not found</div></div>'">
                         </div>
                         <div class="meme-content">
-                            <div class="meme-text">${post.text}</div>
+                            <div class="meme-text">${post.text}<span class="meme-category">${post.hashtag}</span></div>
                             <div class="meme-footer">
-                                <div class="meme-footer-left">
-                                    <button class="like-button ${post.liked ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
-                                        <span class="like-icon">↑</span>
-                                        <span class="like-count">${post.likes}</span>
-                                    </button>
-                                    <span class="meme-handle" onclick="filterByHandle('${post.handle}')">${post.handle}</span>
-                                </div>
-                                <span class="meme-date">${post.timeAgo}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            grid.innerHTML = html;
-        }
-
-        function hideEmptyState() {
-            const grid = document.getElementById('memeGrid');
-            const emptyState = grid.querySelector('.empty-state');
-            if (emptyState) {
-                emptyState.style.display = 'none';
-            }
-        }
-
-        function showEmptyState() {
-            const grid = document.getElementById('memeGrid');
-            grid.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">🌟</div>
-                    <h3>No posts yet</h3>
-                    <p>Be the first to share something in the Ritual Gallery!</p>
-                </div>
-            `;
-        }
-
-        async function toggleLike(postId) {
-            const post = posts.find(p => p.id === postId);
-            if (post) {
-                post.liked = !post.liked;
-                post.likes += post.liked ? 1 : -1;
-                
-                // Update in database if available
-                try {
-                    if (db) {
-                        await db.collection('posts').doc(postId).update({
-                            likes: post.likes,
-                            liked: post.liked
-                        });
-                    } else {
-                        localStorage.setItem('ritualPosts', JSON.stringify(posts));
-                    }
-                } catch (error) {
-                    console.error('Error updating like:', error);
-                }
-                
-                renderPosts();
-            }
-        }
-
-        function filterByHandle(handle) {
-            const filteredPosts = posts.filter(post => post.handle === handle);
-            const grid = document.getElementById('memeGrid');
-            const filterSection = document.getElementById('filterSection');
-            const filterBadge = document.getElementById('filterBadge');
-
-            if (filteredPosts.length === 0) {
-                grid.innerHTML = `
-                    <div class="no-results">
-                        <h3>No posts found</h3>
-                        <p>No posts from ${handle} yet.</p>
-                    </div>
-                `;
-            } else {
-                let html = '';
-                filteredPosts.forEach(post => {
-                    html += `
-                        <div class="meme-card">
-                            <div class="meme-image" onclick="openImageModal('${post.imageSrc}', '${post.handle}', '${post.text}', '${post.timeAgo}')">
-                                <img src="${post.imageSrc}" alt="Post by ${post.handle}">
-                            </div>
-                            <div class="meme-content">
-                                <div class="meme-text">${post.text}</div>
-                                <div class="meme-footer">
-                                    <div class="meme-footer-left">
-                                        <button class="like-button ${post.liked ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
-                                            <span class="like-icon">↑</span>
-                                            <span class="like-count">${post.likes}</span>
-                                        </button>
-                                        <span class="meme-handle">${post.handle}</span>
-                                    </div>
-                                    <span class="meme-date">${post.timeAgo}</span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-                grid.innerHTML = html;
-            }
-
-            filterBadge.textContent = `Showing posts by ${handle}`;
-            filterSection.style.display = 'flex';
-        }
-
-        // Clear filter functionality
-        document.getElementById('clearFilter').addEventListener('click', function() {
-            document.getElementById('filterSection').style.display = 'none';
-            renderPosts();
-        });
-
-        // Modal functionality
-        function openImageModal(imageSrc, handle, text, date) {
-            const modal = document.getElementById('imageModal');
-            const modalImage = document.getElementById('modalImage');
-            const modalText = document.getElementById('modalText');
-            const modalHandle = document.getElementById('modalHandle');
-            const modalDate = document.getElementById('modalDate');
-            const modalInfo = document.getElementById('modalInfo');
-
-            modalImage.src = imageSrc;
-            modalText.textContent = text;
-            modalHandle.textContent = handle;
-            modalDate.textContent = date;
-            
-            modal.style.display = 'block';
-            modalInfo.style.display = 'block';
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeImageModal() {
-            const modal = document.getElementById('imageModal');
-            modal.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-
-        // Close modal when clicking outside the image
-        document.getElementById('imageModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeImageModal();
-            }
-        });
-
-        // Close modal with ESC key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeImageModal();
-            }
-        });
-
-        function showStatus(message, type) {
-            const statusDiv = document.getElementById('statusMessage');
-            const className = type === 'info' ? 'status-success' : `status-${type}`;
-            statusDiv.innerHTML = `<div class="status-message ${className}">${message}</div>`;
-            
-            setTimeout(() => {
-                statusDiv.innerHTML = '';
-            }, 5000);
-        }
-    </script>
-</body>
-</html>
