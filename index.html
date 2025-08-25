@@ -386,6 +386,7 @@
             position: absolute;
             left: -9999px;
             opacity: 0;
+            pointer-events: none;
         }
 
         .file-upload-button {
@@ -404,6 +405,7 @@
             box-sizing: border-box;
             display: flex;
             align-items: center;
+            text-decoration: none;
         }
 
         .file-upload-button:hover {
@@ -747,9 +749,9 @@
                 <div class="form-group">
                     <div class="file-upload-wrapper">
                         <input type="file" id="fileInput" class="file-upload-input" accept="image/*">
-                        <div class="file-upload-button" id="fileUploadButton">
+                        <label for="fileInput" class="file-upload-button">
                             Choose File | <span class="file-name" id="fileName">No file selected</span>
-                        </div>
+                        </label>
                     </div>
                 </div>
                 <div class="form-group submit-group">
@@ -810,12 +812,6 @@
 
         function initializeFileUpload() {
             const fileInput = document.getElementById('fileInput');
-            const fileUploadButton = document.getElementById('fileUploadButton');
-            
-            // Make the upload button clickable
-            fileUploadButton.addEventListener('click', function() {
-                fileInput.click();
-            });
             
             // Handle file selection
             fileInput.addEventListener('change', function(e) {
@@ -917,9 +913,220 @@
                 reader.onerror = function() {
                     reject(new Error('Failed to read file.'));
                 };
-                reader.readAsDataURL(file);
-            });
+        async function createAndSavePost(handle, imageSrc, category) {
+            const categoryHashtags = {
+                meme: '#meme',
+                art: '#art',
+                myritual: '#myritual'
+            };
+
+            const post = {
+                id: Date.now().toString(),
+                handle: handle,
+                imageSrc: imageSrc,
+                text: `New post from ${handle} ✨ ${categoryHashtags[category]}`,
+                category: category,
+                hashtag: categoryHashtags[category],
+                timestamp: new Date(),
+                timeAgo: 'just now',
+                likes: 0,
+                liked: false
+            };
+
+            // Add to posts array (memory storage only for artifacts)
+            posts.unshift(post);
+            renderPosts();
+            hideEmptyState();
         }
+
+        function completeSubmission(btn, buttonText, loading) {
+            showStatus('Post submitted successfully!', 'success');
+            
+            // Reset form
+            document.getElementById('handleInput').value = '';
+            document.getElementById('categorySelect').value = '';
+            document.getElementById('imageUrl').value = '';
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileName').textContent = 'No file selected';
+            
+            btn.disabled = false;
+            buttonText.style.opacity = '1';
+            loading.style.display = 'none';
+        }
+
+        function renderPosts() {
+            const grid = document.getElementById('memeGrid');
+            
+            if (posts.length === 0) {
+                showEmptyState();
+                return;
+            }
+
+            let html = '';
+            posts.forEach(post => {
+                html += `
+                    <div class="meme-card">
+                        <div class="meme-image" onclick="openImageModal('${post.imageSrc}', '${post.handle}', '${post.text}', '${post.timeAgo}')">
+                            <img src="${post.imageSrc}" alt="Post by ${post.handle}" onerror="this.parentElement.innerHTML='<div class=\\"meme-placeholder\\"><div class=\\"meme-placeholder-icon\\">📷</div><div>Image not found</div></div>'">
+                        </div>
+                        <div class="meme-content">
+                            <div class="meme-text">${post.text}<span class="meme-category">${post.hashtag}</span></div>
+                            <div class="meme-footer">
+                                <div class="meme-footer-left">
+                                    <div class="like-button ${post.liked ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
+                                        <span class="like-icon">❤️</span>
+                                        <span class="like-count">${post.likes}</span>
+                                    </div>
+                                    <span class="meme-handle" onclick="filterByHandle('${post.handle}')">${post.handle}</span>
+                                </div>
+                                <span class="meme-date">${post.timeAgo}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            grid.innerHTML = html;
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.innerHTML = `<div class="status-message status-${type}">${message}</div>`;
+            
+            // Auto-hide success messages after 3 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.innerHTML = '';
+                }, 3000);
+            }
+        }
+
+        function showEmptyState() {
+            const grid = document.getElementById('memeGrid');
+            grid.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🌟</div>
+                    <h3>No posts yet</h3>
+                    <p>Be the first to share something in the Ritual Gallery!</p>
+                </div>
+            `;
+        }
+
+        function hideEmptyState() {
+            // This function is called when posts exist, renderPosts will handle the display
+        }
+
+        function filterByCategory(category) {
+            currentCategoryFilter = category;
+            
+            // Update active button
+            document.querySelectorAll('.category-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Filter and render posts
+            const filteredPosts = category === 'all' ? posts : posts.filter(post => post.category === category);
+            renderFilteredPosts(filteredPosts);
+        }
+
+        function renderFilteredPosts(filteredPosts) {
+            const grid = document.getElementById('memeGrid');
+            
+            if (filteredPosts.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔍</div>
+                        <h3>No posts found</h3>
+                        <p>Try a different category or add some posts!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            filteredPosts.forEach(post => {
+                html += `
+                    <div class="meme-card">
+                        <div class="meme-image" onclick="openImageModal('${post.imageSrc}', '${post.handle}', '${post.text}', '${post.timeAgo}')">
+                            <img src="${post.imageSrc}" alt="Post by ${post.handle}" onerror="this.parentElement.innerHTML='<div class=\\"meme-placeholder\\"><div class=\\"meme-placeholder-icon\\">📷</div><div>Image not found</div></div>'">
+                        </div>
+                        <div class="meme-content">
+                            <div class="meme-text">${post.text}<span class="meme-category">${post.hashtag}</span></div>
+                            <div class="meme-footer">
+                                <div class="meme-footer-left">
+                                    <div class="like-button ${post.liked ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
+                                        <span class="like-icon">❤️</span>
+                                        <span class="like-count">${post.likes}</span>
+                                    </div>
+                                    <span class="meme-handle" onclick="filterByHandle('${post.handle}')">${post.handle}</span>
+                                </div>
+                                <span class="meme-date">${post.timeAgo}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            grid.innerHTML = html;
+        }
+
+        function toggleLike(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (post) {
+                post.liked = !post.liked;
+                post.likes += post.liked ? 1 : -1;
+                renderPosts();
+            }
+        }
+
+        function filterByHandle(handle) {
+            // Show filter section
+            const filterSection = document.getElementById('filterSection');
+            const filterBadge = document.getElementById('filterBadge');
+            
+            filterSection.style.display = 'flex';
+            filterBadge.textContent = `Showing posts by ${handle}`;
+            
+            // Filter posts by handle
+            const filteredPosts = posts.filter(post => post.handle === handle);
+            renderFilteredPosts(filteredPosts);
+        }
+
+        function openImageModal(src, handle, text, timeAgo) {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            const modalInfo = document.getElementById('modalInfo');
+            const modalText = document.getElementById('modalText');
+            const modalHandle = document.getElementById('modalHandle');
+            const modalDate = document.getElementById('modalDate');
+            
+            modalImage.src = src;
+            modalText.textContent = text;
+            modalHandle.textContent = handle;
+            modalDate.textContent = timeAgo;
+            
+            modalInfo.style.display = 'block';
+            modal.style.display = 'block';
+        }
+
+        function closeImageModal() {
+            const modal = document.getElementById('imageModal');
+            modal.style.display = 'none';
+        }
+
+        // Clear filter functionality
+        document.getElementById('clearFilter').addEventListener('click', function() {
+            document.getElementById('filterSection').style.display = 'none';
+            renderPosts();
+        });
+
+        // Close modal when clicking outside the image
+        document.getElementById('imageModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeImageModal();
+            }
+        });
 
         async function validateImageUrl(url) {
             return new Promise((resolve, reject) => {
